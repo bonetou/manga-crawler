@@ -1,21 +1,27 @@
-import { Dataset, createCheerioRouter } from 'crawlee';
+import { Dataset, createCheerioRouter, extractUrls } from 'crawlee';
 
 export const router = createCheerioRouter();
 
 router.addDefaultHandler(async ({ enqueueLinks, log }) => {
     log.info(`enqueueing new URLs`);
     await enqueueLinks({
-        globs: ['https://crawlee.dev/**'],
-        label: 'detail',
+        selector: '#chapters > div > a',
+        label: 'chapter-handler',
     });
 });
 
-router.addHandler('detail', async ({ request, $, log }) => {
-    const title = $('title').text();
-    log.info(`${title}`, { url: request.loadedUrl });
+
+router.addHandler('chapter-handler', async ({ request, $, log, enqueueLinks }) => {
+    const chapterTitle = $('#top').text();
+    const chapterImages = $('img.js-page');
+    const imageSources = chapterImages.map((i, chapterImage) => {
+        return $(chapterImage).attr('data-src');
+    }).toArray();
+
+    log.info(`Chapter ${chapterTitle}. Found ${imageSources.length} images`);
 
     await Dataset.pushData({
-        url: request.loadedUrl,
-        title,
-    });
+        title: chapterTitle,
+        images: imageSources,
+    })
 });
