@@ -1,21 +1,25 @@
-import { Dataset, createCheerioRouter } from 'crawlee';
+import { Dataset, KeyValueStore, createCheerioRouter } from 'crawlee';
 export const router = createCheerioRouter();
 import fs from 'fs';
 
-router.addDefaultHandler(async ({ enqueueLinks, log,  }) => {
+router.addDefaultHandler(async ({ request, enqueueLinks }) => {
     await enqueueLinks({
         selector: '#chapters > div > a',
         label: 'CHAPTER-HANDLER',
+        userData: {
+            mangaTitle: request.url.split('/').pop() || 'manga',
+        }
     });
 });
 
 
 router.addHandler('CHAPTER-HANDLER', async ({ $, log, request, sendRequest }) => {
+    const mangaTitle = request.userData.mangaTitle;
     const chapterTitle = request.url.split('/').pop() || '';
     const chapterImages = $('img.js-page');
     const imageSources = chapterImages.map((i, chapterImage) => {
         return $(chapterImage).attr('data-src');
-    }).toArray();
+    }).toArray().sort();
 
     log.info(`Chapter ${chapterTitle}. Found ${imageSources.length} images`);
 
@@ -28,16 +32,8 @@ router.addHandler('CHAPTER-HANDLER', async ({ $, log, request, sendRequest }) =>
             url: imageSource,
             responseType: 'buffer',
         })
-        const fileName = imageSource.split('/').pop()
-        log.info(`Saving chapter: ${chapterTitle} - image: ${imageSource}, fileName: ${fileName}`)
-        saveImage(response.rawBody, fileName, chapterTitle)
+        log.info(`Saving ${mangaTitle} chapter: ${chapterTitle}`);
+        const mangaStorage = await KeyValueStore.open(`./${mangaTitle}/${chapterTitle}`);
+        await mangaStorage.setValue(`${imageSources.indexOf(imageSource)}`, response.rawBody, {'contentType': 'image/jpeg'});
     });
 });
-
-
-let saveImage = async (imageBuffer: Buffer, fileName: string, chapterTitle: string) => {
-    fs.mkdirSync(`./downloaded/${chapterTitle}`, { recursive: true });  
-    const writer = fs.createWriteStream(`./downloaded/${chapterTitle}/${fileName}`);
-    writer.write(imageBuffer);
-    writer.end();
-}
