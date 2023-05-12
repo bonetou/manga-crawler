@@ -1,6 +1,7 @@
 import { Dataset, KeyValueStore, createCheerioRouter } from 'crawlee';
+
+
 export const router = createCheerioRouter();
-import fs from 'fs';
 
 router.addDefaultHandler(async ({ request, enqueueLinks }) => {
     await enqueueLinks({
